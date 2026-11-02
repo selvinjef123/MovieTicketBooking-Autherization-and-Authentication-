@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using MovieTicketBooking.Models;
-using System.Reflection.Emit;
 
 namespace MovieTicketBooking.Data;
 
@@ -8,6 +7,7 @@ public class ApplicationDbContext : DbContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
+    public DbSet<User> Users => Set<User>();
     public DbSet<Movie> Movies => Set<Movie>();
     public DbSet<Theatre> Theatres => Set<Theatre>();
     public DbSet<Screen> Screens => Set<Screen>();
@@ -20,6 +20,18 @@ public class ApplicationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // User
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(e => e.UserId);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Email).IsRequired().HasMaxLength(150);
+            entity.HasIndex(e => e.Email).IsUnique();
+            entity.Property(e => e.PasswordHash).IsRequired();
+            entity.Property(e => e.Phone).IsRequired().HasMaxLength(15);
+            entity.Property(e => e.Role).HasConversion<string>().HasMaxLength(20);
+        });
 
         // Movie
         modelBuilder.Entity<Movie>(entity =>

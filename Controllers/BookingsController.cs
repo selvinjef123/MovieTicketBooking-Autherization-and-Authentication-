@@ -2,6 +2,7 @@
 using MovieTicketBooking.DTOs.Bookings;
 using MovieTicketBooking.Models;
 using MovieTicketBooking.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 
 namespace MovieTicketBooking.Controllers;
 
@@ -24,6 +25,7 @@ public class BookingsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<IActionResult> Create([FromBody] CreateBookingRequest request)
     {
         var (response, error, statusCode) = await _service.CreateBookingAsync(request);

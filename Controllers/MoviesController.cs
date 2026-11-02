@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using MovieTicketBooking.DTOs.Movies;
 using MovieTicketBooking.Services.Interfaces;
 
@@ -27,6 +28,7 @@ public class MoviesController : ControllerBase
         Ok(await _service.GetAllAsync(1, 20, title));
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateMovieRequest request)
     {
         var created = await _service.CreateAsync(request);
@@ -34,6 +36,7 @@ public class MoviesController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMovieRequest request)
     {
         var updated = await _service.UpdateAsync(id, request);
@@ -41,6 +44,7 @@ public class MoviesController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
     {
         var (success, errorMessage) = await _service.DeleteAsync(id);

@@ -11,3 +11,9 @@ public enum BookingStatus
     Confirmed,
     Cancelled
 }
+
+public enum UserRole
+{
+    Customer,
+    Admin
+}
