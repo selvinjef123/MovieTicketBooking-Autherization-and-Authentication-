@@ -41,8 +41,16 @@ public class ScreenService : IScreenService
         };
 
         var created = await _screenRepository.CreateAsync(screen);
-        created.Theatre = theatre;
-        return (MapToResponse(created), null);
+
+        // Map safely using scalar values to avoid triggering EF Core navigation cycles/nulls
+        var response = new ScreenResponse(
+            created.ScreenId,
+            created.TheatreId,
+            created.ScreenName,
+            theatre.Name
+        );
+
+        return (response, null);
     }
 
     public async Task<bool> UpdateAsync(int id, UpdateScreenRequest request)
@@ -68,5 +76,10 @@ public class ScreenService : IScreenService
     }
 
     private static ScreenResponse MapToResponse(Screen s) =>
-        new(s.ScreenId, s.TheatreId, s.ScreenName, s.Theatre?.Name ?? string.Empty);
+        new(
+            s.ScreenId,
+            s.TheatreId,
+            s.ScreenName,
+            s.Theatre != null ? s.Theatre.Name : string.Empty
+        );
 }

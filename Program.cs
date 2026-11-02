@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -25,10 +26,11 @@ builder.Services.AddScoped<IShowRepository, ShowRepository>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 
 // Register Services
+// Register Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IMovieService, MovieService>();
 builder.Services.AddScoped<ITheatreService, TheatreService>();
-builder.Services.AddScoped<IScreenService, ScreenService>();
+builder.Services.AddScoped<IScreenService, ScreenService>(); // <-- ADD THIS LINE
 builder.Services.AddScoped<ISeatService, SeatService>();
 builder.Services.AddScoped<IShowService, ShowService>();
 builder.Services.AddScoped<IBookingService, BookingService>();
@@ -52,7 +54,10 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtSettings["Issuer"],
         ValidAudience = jwtSettings["Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(key)
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        // Ensures [Authorize(Roles = "Admin")] accurately maps the JWT role claim
+        RoleClaimType = ClaimTypes.Role,
+        NameClaimType = ClaimTypes.Name
     };
 });
 
@@ -88,10 +93,9 @@ app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseCors("AllowAngularApp");
 
-// Ensure Authentication executes before Authorization
+// Middleware Pipeline Order
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
 app.Run();

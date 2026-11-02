@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using MovieTicketBooking.DTOs.Auth;
-using MovieTicketBooking.Services.Interfaces;
+using MovieTicketBooking.Services.Interfaces; // <-- Missing namespace directive
 
 namespace MovieTicketBooking.Controllers;
 
