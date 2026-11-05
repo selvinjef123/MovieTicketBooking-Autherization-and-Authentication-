@@ -62,8 +62,10 @@ namespace MovieTicketBooking.Migrations
                         .HasColumnType("nvarchar(20)");
 
                     b.Property<decimal>("TotalAmount")
-                        .HasPrecision(10, 2)
                         .HasColumnType("decimal(10,2)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
 
                     b.HasKey("BookingId");
 
@@ -72,7 +74,12 @@ namespace MovieTicketBooking.Migrations
 
                     b.HasIndex("ShowId");
 
-                    b.ToTable("Bookings");
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Bookings", t =>
+                        {
+                            t.HasCheckConstraint("CK_Booking_TotalAmount", "[TotalAmount] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("MovieTicketBooking.Models.BookingSeat", b =>
@@ -87,7 +94,6 @@ namespace MovieTicketBooking.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("Price")
-                        .HasPrecision(10, 2)
                         .HasColumnType("decimal(10,2)");
 
                     b.Property<int>("SeatId")
@@ -99,7 +105,10 @@ namespace MovieTicketBooking.Migrations
 
                     b.HasIndex("SeatId");
 
-                    b.ToTable("BookingSeats");
+                    b.ToTable("BookingSeats", t =>
+                        {
+                            t.HasCheckConstraint("CK_BookingSeat_Price", "[Price] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("MovieTicketBooking.Models.Movie", b =>
@@ -128,7 +137,7 @@ namespace MovieTicketBooking.Migrations
                         .HasColumnType("nvarchar(50)");
 
                     b.Property<DateTime>("ReleaseDate")
-                        .HasColumnType("date");
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -137,7 +146,10 @@ namespace MovieTicketBooking.Migrations
 
                     b.HasKey("MovieId");
 
-                    b.ToTable("Movies");
+                    b.ToTable("Movies", t =>
+                        {
+                            t.HasCheckConstraint("CK_Movie_DurationMinutes", "[DurationMinutes] > 0");
+                        });
                 });
 
             modelBuilder.Entity("MovieTicketBooking.Models.Screen", b =>
@@ -185,8 +197,8 @@ namespace MovieTicketBooking.Migrations
 
                     b.Property<string>("SeatType")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.HasKey("SeatId");
 
@@ -217,7 +229,6 @@ namespace MovieTicketBooking.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<decimal>("TicketPrice")
-                        .HasPrecision(10, 2)
                         .HasColumnType("decimal(10,2)");
 
                     b.HasKey("ShowId");
@@ -226,7 +237,10 @@ namespace MovieTicketBooking.Migrations
 
                     b.HasIndex("ScreenId");
 
-                    b.ToTable("Shows");
+                    b.ToTable("Shows", t =>
+                        {
+                            t.HasCheckConstraint("CK_Show_TicketPrice", "[TicketPrice] > 0");
+                        });
                 });
 
             modelBuilder.Entity("MovieTicketBooking.Models.ShowSeat", b =>
@@ -294,10 +308,11 @@ namespace MovieTicketBooking.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("nvarchar(150)");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("Name");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -329,7 +344,14 @@ namespace MovieTicketBooking.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("MovieTicketBooking.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Show");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("MovieTicketBooking.Models.BookingSeat", b =>
@@ -367,7 +389,7 @@ namespace MovieTicketBooking.Migrations
                     b.HasOne("MovieTicketBooking.Models.Screen", "Screen")
                         .WithMany("Seats")
                         .HasForeignKey("ScreenId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Screen");

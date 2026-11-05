@@ -1,12 +1,13 @@
-﻿using MovieTicketBooking.DTOs.Movies;
+using MovieTicketBooking.DTOs.Movies;
 
 namespace MovieTicketBooking.Services.Interfaces;
 
 public interface IMovieService
 {
-    Task<IEnumerable<MovieResponse>> GetAllAsync(int pageNumber, int pageSize, string? title);
-    Task<MovieResponse?> GetByIdAsync(int id);
-    Task<MovieResponse> CreateAsync(CreateMovieRequest request);
-    Task<bool> UpdateAsync(int id, UpdateMovieRequest request);
-    Task<(bool Success, string? ErrorMessage)> DeleteAsync(int id);
+    Task<IEnumerable<MovieResponse>> GetAllMoviesAsync();
+    Task<MovieResponse?> GetMovieByIdAsync(int id);
+    Task<IEnumerable<MovieResponse>> SearchMoviesAsync(string title);
+    Task<MovieResponse> CreateMovieAsync(CreateMovieRequest request);
+    Task<bool> UpdateMovieAsync(int id, UpdateMovieRequest request);
+    Task<bool> DeleteMovieAsync(int id);
 }

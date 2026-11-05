@@ -1,4 +1,4 @@
-﻿using MovieTicketBooking.Models;
+using MovieTicketBooking.Models;
 
 namespace MovieTicketBooking.Repositories.Interfaces;
 
@@ -6,8 +6,7 @@ public interface ITheatreRepository
 {
     Task<IEnumerable<Theatre>> GetAllAsync();
     Task<Theatre?> GetByIdAsync(int id);
-    Task<Theatre> CreateAsync(Theatre theatre);
+    Task<Theatre> AddAsync(Theatre theatre);
     Task UpdateAsync(Theatre theatre);
     Task DeleteAsync(Theatre theatre);
-    Task<bool> HasScreensAsync(int theatreId);
 }

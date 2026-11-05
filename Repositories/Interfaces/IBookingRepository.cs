@@ -1,11 +1,14 @@
-﻿using MovieTicketBooking.Models;
+using MovieTicketBooking.Models;
 
 namespace MovieTicketBooking.Repositories.Interfaces;
 
 public interface IBookingRepository
 {
-    Task<IEnumerable<Booking>> GetAllAsync(int? showId, BookingStatus? status);
+    Task<IEnumerable<Booking>> GetAllAsync();
     Task<Booking?> GetByIdAsync(int id);
-    Task<Booking> CreateBookingInTransactionAsync(Booking booking, List<ShowSeat> showSeatsToUpdate);
-    Task CancelBookingInTransactionAsync(Booking booking, List<ShowSeat> showSeatsToRelease);
+    Task<Booking?> GetByIdForUpdateAsync(int id);
+    Task<IEnumerable<Booking>> GetByShowIdAsync(int showId);
+    Task<IEnumerable<Booking>> GetByUserIdAsync(int userId);
+    Task<Booking> CreateBookingAsync(Booking booking, IEnumerable<BookingSeat> bookingSeats, IEnumerable<ShowSeat> showSeatsToUpdate);
+    Task CancelBookingAsync(Booking booking, IEnumerable<ShowSeat> showSeatsToRelease);
 }

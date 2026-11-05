@@ -1,19 +1,20 @@
-﻿using System.ComponentModel.DataAnnotations;
-
 namespace MovieTicketBooking.DTOs.Screens;
 
-public record CreateScreenRequest(
-    [Range(1, int.MaxValue)] int TheatreId,
-    [Required, StringLength(50)] string ScreenName
-);
+public class CreateScreenRequest
+{
+    public int TheatreId { get; set; }
+    public string ScreenName { get; set; } = string.Empty;
+}
 
-public record UpdateScreenRequest(
-    [Required, StringLength(50)] string ScreenName
-);
+public class UpdateScreenRequest
+{
+    public string ScreenName { get; set; } = string.Empty;
+}
 
-public record ScreenResponse(
-    int ScreenId,
-    int TheatreId,
-    string ScreenName,
-    string TheatreName
-);
+public class ScreenResponse
+{
+    public int ScreenId { get; set; }
+    public int TheatreId { get; set; }
+    public string TheatreName { get; set; } = string.Empty;
+    public string ScreenName { get; set; } = string.Empty;
+}

@@ -1,4 +1,4 @@
-﻿using MovieTicketBooking.DTOs.Bookings;
+using MovieTicketBooking.DTOs.Bookings;
 using MovieTicketBooking.Models;
 using MovieTicketBooking.Repositories.Interfaces;
 using MovieTicketBooking.Services.Interfaces;
@@ -16,98 +16,116 @@ public class BookingService : IBookingService
         _showRepository = showRepository;
     }
 
-    public async Task<IEnumerable<BookingResponse>> GetAllAsync(int? showId, BookingStatus? status)
+    public async Task<IEnumerable<BookingResponse>> GetAllBookingsAsync()
     {
-        var bookings = await _bookingRepository.GetAllAsync(showId, status);
-        return bookings.Select(MapToResponse);
+        var bookings = await _bookingRepository.GetAllAsync();
+        return bookings.Select(MapToBookingResponse);
     }
 
-    public async Task<BookingResponse?> GetByIdAsync(int id)
+    public async Task<BookingResponse?> GetBookingByIdAsync(int id, int? userId = null)
     {
         var booking = await _bookingRepository.GetByIdAsync(id);
-        return booking == null ? null : MapToResponse(booking);
+        if (booking == null) return null;
+        if (userId.HasValue && booking.UserId != userId.Value) return null;
+        return MapToBookingResponse(booking);
     }
 
-    public async Task<(BookingResponse? Response, string? ErrorMessage, int StatusCode)> CreateBookingAsync(CreateBookingRequest request)
+    public async Task<IEnumerable<BookingResponse>> GetBookingsByShowIdAsync(int showId)
+    {
+        var bookings = await _bookingRepository.GetByShowIdAsync(showId);
+        return bookings.Select(MapToBookingResponse);
+    }
+
+    public async Task<IEnumerable<BookingResponse>> GetBookingsByUserIdAsync(int userId)
+    {
+        var bookings = await _bookingRepository.GetByUserIdAsync(userId);
+        return bookings.Select(MapToBookingResponse);
+    }
+
+    public async Task<BookingResponse> CreateBookingAsync(CreateBookingRequest request, int userId, string customerName, string customerEmail)
     {
         var show = await _showRepository.GetByIdAsync(request.ShowId);
-        if (show == null)
-            return (null, $"Show with ID {request.ShowId} does not exist.", 404);
+        if (show == null) throw new KeyNotFoundException("Show not found.");
 
-        var requestedSeatIds = request.SeatIds.Distinct().ToList();
-        var showSeats = (await _showRepository.GetShowSeatsAsync(request.ShowId)).ToList();
+        // Verify distinct seat IDs
+        var distinctSeatIds = request.SeatIds?.Distinct().ToList() ?? new List<int>();
+        if (!distinctSeatIds.Any()) throw new ArgumentException("Choose at least one seat.");
 
-        var matchedShowSeats = showSeats.Where(ss => requestedSeatIds.Contains(ss.SeatId)).ToList();
+        var showSeatsToUpdate = new List<ShowSeat>();
+        var bookingSeats = new List<BookingSeat>();
+        decimal totalAmount = 0;
 
-        if (matchedShowSeats.Count != requestedSeatIds.Count)
-            return (null, "One or more selected seats do not exist for this show's screen.", 400);
-
-        var unavailableSeats = matchedShowSeats.Where(ss => ss.Status != SeatStatus.Available).ToList();
-        if (unavailableSeats.Count > 0)
+        foreach (var seatId in distinctSeatIds)
         {
-            var seatLabels = string.Join(", ", unavailableSeats.Select(s => $"{s.Seat.RowName}{s.Seat.SeatNumber}"));
-            return (null, $"Seats are no longer available: {seatLabels}", 409);
+            var showSeat = await _showRepository.GetShowSeatAsync(request.ShowId, seatId);
+            if (showSeat == null) throw new InvalidOperationException($"Seat {seatId} does not belong to this show.");
+            if (showSeat.Status != "Available") throw new InvalidOperationException($"Seat {showSeat.Seat.RowName}{showSeat.Seat.SeatNumber} is already booked.");
+
+            showSeatsToUpdate.Add(showSeat);
+
+            decimal seatPrice = show.TicketPrice;
+            totalAmount += seatPrice;
+
+            bookingSeats.Add(new BookingSeat
+            {
+                SeatId = seatId,
+                Price = seatPrice
+            });
         }
 
-        decimal totalAmount = requestedSeatIds.Count * show.TicketPrice;
-        string reference = $"MOV{Random.Shared.Next(100000, 999999)}";
+        var tempReference = $"MOV-{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}";
 
         var booking = new Booking
         {
-            BookingReference = reference,
+            BookingReference = tempReference,
             ShowId = request.ShowId,
-            CustomerName = request.CustomerName,
-            CustomerEmail = request.CustomerEmail,
+            UserId = userId,
+            CustomerName = customerName,
+            CustomerEmail = customerEmail,
             CustomerPhone = request.CustomerPhone,
             BookingDate = DateTime.UtcNow,
             TotalAmount = totalAmount,
-            Status = BookingStatus.Confirmed,
-            BookingSeats = requestedSeatIds.Select(seatId => new BookingSeat
-            {
-                SeatId = seatId,
-                Price = show.TicketPrice
-            }).ToList()
+            Status = "Confirmed"
         };
 
-        var createdBooking = await _bookingRepository.CreateBookingInTransactionAsync(booking, matchedShowSeats);
-        var fullBooking = await _bookingRepository.GetByIdAsync(createdBooking.BookingId);
+        var createdBooking = await _bookingRepository.CreateBookingAsync(booking, bookingSeats, showSeatsToUpdate);
 
-        return (MapToResponse(fullBooking!), null, 201);
+        var fullBooking = await _bookingRepository.GetByIdAsync(createdBooking.BookingId);
+        return MapToBookingResponse(fullBooking!);
     }
 
-    public async Task<(bool Success, string? ErrorMessage, int StatusCode)> CancelBookingAsync(int id)
+    public async Task<(bool Success, string? Error)> CancelBookingAsync(int id, int? userId = null)
     {
         var booking = await _bookingRepository.GetByIdAsync(id);
-        if (booking == null)
-            return (false, $"Booking with ID {id} not found.", 404);
+        if (booking == null) return (false, "Booking not found.");
+        if (userId.HasValue && booking.UserId != userId.Value) return (false, "You cannot cancel another customer's booking.");
+        if (booking.Status == "Cancelled") return (false, "Booking is already cancelled.");
 
-        if (booking.Status == BookingStatus.Cancelled)
-            return (false, "Booking is already cancelled.", 400);
+        var showSeatsToRelease = new List<ShowSeat>();
+        foreach (var bs in booking.BookingSeats)
+        {
+            var showSeat = await _showRepository.GetShowSeatAsync(booking.ShowId, bs.SeatId);
+            if (showSeat != null) showSeatsToRelease.Add(showSeat);
+        }
 
-        var bookedSeatIds = booking.BookingSeats.Select(bs => bs.SeatId).ToList();
-        var showSeatsToRelease = (await _showRepository.GetShowSeatsAsync(booking.ShowId))
-            .Where(ss => bookedSeatIds.Contains(ss.SeatId))
-            .ToList();
-
-        await _bookingRepository.CancelBookingInTransactionAsync(booking, showSeatsToRelease);
-        return (true, null, 200);
+        await _bookingRepository.CancelBookingAsync(booking, showSeatsToRelease);
+        return (true, null);
     }
 
-    private static BookingResponse MapToResponse(Booking b) =>
-        new(
-            b.BookingId,
-            b.BookingReference,
-            b.ShowId,
-            b.Show?.Movie?.Title ?? string.Empty,
-            b.Show?.Screen?.Theatre?.Name ?? string.Empty,
-            b.Show?.Screen?.ScreenName ?? string.Empty,
-            b.Show?.StartTime ?? DateTime.MinValue,
-            b.CustomerName,
-            b.CustomerEmail,
-            b.CustomerPhone,
-            b.BookingDate,
-            b.TotalAmount,
-            b.Status.ToString(),
-            b.BookingSeats.Select(bs => $"{bs.Seat.RowName}{bs.Seat.SeatNumber}").ToList()
-        );
+    private static BookingResponse MapToBookingResponse(Booking b) => new()
+    {
+        BookingId = b.BookingId,
+        BookingReference = b.BookingReference,
+        ShowId = b.ShowId,
+        MovieTitle = b.Show?.Movie?.Title ?? string.Empty,
+        TheatreName = b.Show?.Screen?.Theatre?.Name ?? string.Empty,
+        ScreenName = b.Show?.Screen?.ScreenName ?? string.Empty,
+        CustomerName = b.CustomerName,
+        CustomerEmail = b.CustomerEmail,
+        CustomerPhone = b.CustomerPhone,
+        BookingDate = b.BookingDate,
+        TotalAmount = b.TotalAmount,
+        Status = b.Status,
+        Seats = b.BookingSeats?.Select(bs => $"{bs.Seat?.RowName}{bs.Seat?.SeatNumber}").ToList() ?? new()
+    };
 }

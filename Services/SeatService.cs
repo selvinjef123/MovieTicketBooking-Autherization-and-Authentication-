@@ -1,4 +1,4 @@
-﻿using MovieTicketBooking.DTOs.Seats;
+using MovieTicketBooking.DTOs.Seats;
 using MovieTicketBooking.Models;
 using MovieTicketBooking.Repositories.Interfaces;
 using MovieTicketBooking.Services.Interfaces;
@@ -8,101 +8,66 @@ namespace MovieTicketBooking.Services;
 public class SeatService : ISeatService
 {
     private readonly ISeatRepository _seatRepository;
-    private readonly IScreenRepository _screenRepository;
+    public SeatService(ISeatRepository seatRepository) => _seatRepository = seatRepository;
 
-    public SeatService(ISeatRepository seatRepository, IScreenRepository screenRepository)
-    {
-        _seatRepository = seatRepository;
-        _screenRepository = screenRepository;
-    }
-
-    public async Task<IEnumerable<SeatResponse>> GetByScreenIdAsync(int screenId)
+    public async Task<IEnumerable<SeatResponse>> GetSeatsByScreenIdAsync(int screenId)
     {
         var seats = await _seatRepository.GetByScreenIdAsync(screenId);
-        return seats.Select(MapToResponse);
+        return seats.Select(s => new SeatResponse { SeatId = s.SeatId, ScreenId = s.ScreenId, RowName = s.RowName, SeatNumber = s.SeatNumber, SeatType = s.SeatType });
     }
 
-    public async Task<SeatResponse?> GetByIdAsync(int id)
+    public async Task<SeatResponse?> GetSeatByIdAsync(int id)
     {
-        var seat = await _seatRepository.GetByIdAsync(id);
-        return seat == null ? null : MapToResponse(seat);
+        var s = await _seatRepository.GetByIdAsync(id);
+        if (s == null) return null;
+        return new SeatResponse { SeatId = s.SeatId, ScreenId = s.ScreenId, RowName = s.RowName, SeatNumber = s.SeatNumber, SeatType = s.SeatType };
     }
 
-    public async Task<(SeatResponse? Response, string? ErrorMessage)> CreateAsync(CreateSeatRequest request)
+    public async Task<SeatResponse> CreateSeatAsync(CreateSeatRequest request)
     {
-        var screen = await _screenRepository.GetByIdAsync(request.ScreenId);
-        if (screen == null)
-            return (null, $"Screen with ID {request.ScreenId} does not exist.");
+        var seat = new Seat { ScreenId = request.ScreenId, RowName = request.RowName, SeatNumber = request.SeatNumber, SeatType = request.SeatType };
+        var created = await _seatRepository.AddAsync(seat);
+        return new SeatResponse { SeatId = created.SeatId, ScreenId = created.ScreenId, RowName = created.RowName, SeatNumber = created.SeatNumber, SeatType = created.SeatType };
+    }
 
-        if (await _seatRepository.ExistsAsync(request.ScreenId, request.RowName, request.SeatNumber))
-            return (null, $"Seat {request.RowName}{request.SeatNumber} already exists on this screen.");
-
-        var seat = new Seat
+    public async Task<IEnumerable<SeatResponse>> BulkCreateSeatsAsync(BulkCreateSeatsRequest request)
+    {
+        var seatsList = new List<Seat>();
+        for (int i = request.StartNumber; i <= request.EndNumber; i++)
         {
-            ScreenId = request.ScreenId,
-            RowName = request.RowName.ToUpper(),
-            SeatNumber = request.SeatNumber,
-            SeatType = request.SeatType
-        };
-
-        var created = await _seatRepository.CreateAsync(seat);
-        return (MapToResponse(created), null);
-    }
-
-    public async Task<(IEnumerable<SeatResponse>? Response, string? ErrorMessage)> BulkCreateAsync(BulkCreateSeatsRequest request)
-    {
-        var screen = await _screenRepository.GetByIdAsync(request.ScreenId);
-        if (screen == null)
-            return (null, $"Screen with ID {request.ScreenId} does not exist.");
-
-        var seatsToCreate = new List<Seat>();
-        foreach (var row in request.RowNames)
-        {
-            var cleanRow = row.Trim().ToUpper();
-            for (int number = 1; number <= request.SeatsPerRow; number++)
+            seatsList.Add(new Seat
             {
-                if (!await _seatRepository.ExistsAsync(request.ScreenId, cleanRow, number))
-                {
-                    seatsToCreate.Add(new Seat
-                    {
-                        ScreenId = request.ScreenId,
-                        RowName = cleanRow,
-                        SeatNumber = number,
-                        SeatType = request.SeatType
-                    });
-                }
-            }
+                ScreenId = request.ScreenId,
+                RowName = request.RowName,
+                SeatNumber = i,
+                SeatType = request.SeatType
+            });
         }
 
-        if (seatsToCreate.Count == 0)
-            return (null, "No new seats were created because all requested seat combinations already exist.");
-
-        await _seatRepository.CreateRangeAsync(seatsToCreate);
-        return (seatsToCreate.Select(MapToResponse), null);
+        await _seatRepository.AddRangeAsync(seatsList);
+        return seatsList.Select(s => new SeatResponse { SeatId = s.SeatId, ScreenId = s.ScreenId, RowName = s.RowName, SeatNumber = s.SeatNumber, SeatType = s.SeatType });
     }
 
-    public async Task<bool> UpdateAsync(int id, UpdateSeatRequest request)
+    public async Task<bool> UpdateSeatAsync(int id, UpdateSeatRequest request)
     {
         var seat = await _seatRepository.GetByIdAsync(id);
         if (seat == null) return false;
-
-        seat.RowName = request.RowName.ToUpper();
+        seat.RowName = request.RowName;
         seat.SeatNumber = request.SeatNumber;
         seat.SeatType = request.SeatType;
-
         await _seatRepository.UpdateAsync(seat);
         return true;
     }
 
-    public async Task<(bool Success, string? ErrorMessage)> DeleteAsync(int id)
+    public async Task<bool> DeleteSeatAsync(int id)
     {
         var seat = await _seatRepository.GetByIdAsync(id);
-        if (seat == null) return (false, null);
-
-        await _seatRepository.DeleteAsync(seat);
-        return (true, null);
+        if (seat == null) return false;
+        try
+        {
+            await _seatRepository.DeleteAsync(seat);
+            return true;
+        }
+        catch { return false; }
     }
-
-    private static SeatResponse MapToResponse(Seat s) =>
-        new(s.SeatId, s.ScreenId, s.RowName, s.SeatNumber, s.SeatType, $"{s.RowName}{s.SeatNumber}");
 }

@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using MovieTicketBooking.Data;
 using MovieTicketBooking.Models;
 using MovieTicketBooking.Repositories.Interfaces;
@@ -10,38 +10,51 @@ public class ShowRepository : IShowRepository
     private readonly ApplicationDbContext _context;
     public ShowRepository(ApplicationDbContext context) => _context = context;
 
-    public async Task<IEnumerable<Show>> GetAllAsync(DateTime? date, int? movieId, int? theatreId)
-    {
-        var query = _context.Shows
-            .Include(s => s.Movie)
-            .Include(s => s.Screen)
-            .ThenInclude(sc => sc.Theatre)
-            .AsNoTracking();
-
-        if (date.HasValue)
-            query = query.Where(s => s.StartTime.Date == date.Value.Date);
-
-        if (movieId.HasValue)
-            query = query.Where(s => s.MovieId == movieId.Value);
-
-        if (theatreId.HasValue)
-            query = query.Where(s => s.Screen.TheatreId == theatreId.Value);
-
-        return await query.ToListAsync();
-    }
+    public async Task<IEnumerable<Show>> GetAllAsync() =>
+        await _context.Shows.Include(s => s.Movie).Include(s => s.Screen).ThenInclude(sc => sc.Theatre).ToListAsync();
 
     public async Task<Show?> GetByIdAsync(int id) =>
-        await _context.Shows
-            .Include(s => s.Movie)
-            .Include(s => s.Screen)
-            .ThenInclude(sc => sc.Theatre)
-            .FirstOrDefaultAsync(s => s.ShowId == id);
+        await _context.Shows.Include(s => s.Movie).Include(s => s.Screen).ThenInclude(sc => sc.Theatre).FirstOrDefaultAsync(s => s.ShowId == id);
 
-    public async Task<Show> CreateAsync(Show show)
+    public async Task<IEnumerable<Show>> GetByMovieIdAsync(int movieId) =>
+        await _context.Shows.Include(s => s.Movie).Include(s => s.Screen).Where(s => s.MovieId == movieId).ToListAsync();
+
+    public async Task<IEnumerable<Show>> GetByTheatreIdAsync(int theatreId) =>
+        await _context.Shows.Include(s => s.Movie).Include(s => s.Screen).Where(s => s.Screen.TheatreId == theatreId).ToListAsync();
+
+    public async Task<IEnumerable<ShowSeat>> GetShowSeatsAsync(int showId) =>
+        await _context.ShowSeats.Include(ss => ss.Seat).Where(ss => ss.ShowId == showId).ToListAsync();
+
+    public async Task<ShowSeat?> GetShowSeatAsync(int showId, int seatId) =>
+        await _context.ShowSeats.Include(ss => ss.Seat).FirstOrDefaultAsync(ss => ss.ShowId == showId && ss.SeatId == seatId);
+
+    public async Task<Show> AddAsync(Show show, IEnumerable<ShowSeat> showSeats)
     {
-        _context.Shows.Add(show);
-        await _context.SaveChangesAsync();
-        return show;
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                _context.Shows.Add(show);
+                await _context.SaveChangesAsync();
+
+                foreach (var seat in showSeats)
+                {
+                    seat.ShowId = show.ShowId;
+                }
+                _context.ShowSeats.AddRange(showSeats);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+                return show;
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
     }
 
     public async Task UpdateAsync(Show show)
@@ -56,28 +69,10 @@ public class ShowRepository : IShowRepository
         await _context.SaveChangesAsync();
     }
 
-    public async Task<bool> HasOverlappingShowAsync(int screenId, DateTime startTime, DateTime endTime, int? excludeShowId = null)
+    public async Task<bool> HasOverlappingShowAsync(int screenId, DateTime startTime, DateTime endTime, int excludeShowId = 0)
     {
-        var query = _context.Shows.Where(s => s.ScreenId == screenId && s.StartTime < endTime && s.EndTime > startTime);
-        if (excludeShowId.HasValue)
-            query = query.Where(s => s.ShowId != excludeShowId.Value);
-
-        return await query.AnyAsync();
+        return await _context.Shows.AnyAsync(s => s.ScreenId == screenId &&
+            s.ShowId != excludeShowId &&
+            s.StartTime < endTime && s.EndTime > startTime);
     }
-
-    public async Task<IEnumerable<ShowSeat>> GetShowSeatsAsync(int showId, SeatStatus? status = null)
-    {
-        var query = _context.ShowSeats
-            .Include(ss => ss.Seat)
-            .Where(ss => ss.ShowId == showId)
-            .AsNoTracking();
-
-        if (status.HasValue)
-            query = query.Where(ss => ss.Status == status.Value);
-
-        return await query.ToListAsync();
-    }
-
-    public async Task<bool> HasBookingsAsync(int showId) =>
-        await _context.Bookings.AnyAsync(b => b.ShowId == showId);
 }

@@ -1,28 +1,33 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace MovieTicketBooking.DTOs.Bookings;
 
-public record CreateBookingRequest(
-    [Required, StringLength(100)] string CustomerName,
-    [Required, EmailAddress, StringLength(150)] string CustomerEmail,
-    [Required, Phone, StringLength(15)] string CustomerPhone,
-    [Range(1, int.MaxValue)] int ShowId,
-    [Required, MinLength(1)] List<int> SeatIds
-);
+public class CreateBookingRequest
+{
+    [Required]
+    [MaxLength(15)]
+    public string CustomerPhone { get; set; } = string.Empty;
 
-public record BookingResponse(
-    int BookingId,
-    string BookingReference,
-    int ShowId,
-    string MovieTitle,
-    string TheatreName,
-    string ScreenName,
-    DateTime ShowStartTime,
-    string CustomerName,
-    string CustomerEmail,
-    string CustomerPhone,
-    DateTime BookingDate,
-    decimal TotalAmount,
-    string Status,
-    List<string> Seats
-);
+    [Required]
+    public int ShowId { get; set; }
+
+    [Required]
+    public List<int> SeatIds { get; set; } = new();
+}
+
+public class BookingResponse
+{
+    public int BookingId { get; set; }
+    public string BookingReference { get; set; } = string.Empty;
+    public int ShowId { get; set; }
+    public string MovieTitle { get; set; } = string.Empty;
+    public string TheatreName { get; set; } = string.Empty;
+    public string ScreenName { get; set; } = string.Empty;
+    public string CustomerName { get; set; } = string.Empty;
+    public string CustomerEmail { get; set; } = string.Empty;
+    public string CustomerPhone { get; set; } = string.Empty;
+    public DateTime BookingDate { get; set; }
+    public decimal TotalAmount { get; set; }
+    public string Status { get; set; } = string.Empty; // Confirmed or Cancelled
+    public List<string> Seats { get; set; } = new(); // e.g., ["A1", "A2"]
+}

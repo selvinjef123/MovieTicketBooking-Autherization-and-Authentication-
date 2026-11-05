@@ -1,32 +1,34 @@
-﻿using System.ComponentModel.DataAnnotations;
-
 namespace MovieTicketBooking.DTOs.Seats;
 
-public record CreateSeatRequest(
-    [Range(1, int.MaxValue)] int ScreenId,
-    [Required, StringLength(5)] string RowName,
-    [Range(1, 500)] int SeatNumber,
-    [Required, StringLength(30)] string SeatType
-);
+public class CreateSeatRequest
+{
+    public int ScreenId { get; set; }
+    public string RowName { get; set; } = string.Empty;
+    public int SeatNumber { get; set; }
+    public string SeatType { get; set; } = string.Empty; // e.g., Regular, Premium
+}
 
-public record BulkCreateSeatsRequest(
-    [Range(1, int.MaxValue)] int ScreenId,
-    [Required] List<string> RowNames,
-    [Range(1, 100)] int SeatsPerRow,
-    [Required, StringLength(30)] string SeatType
-);
+public class BulkCreateSeatsRequest
+{
+    public int ScreenId { get; set; }
+    public string RowName { get; set; } = string.Empty;
+    public int StartNumber { get; set; }
+    public int EndNumber { get; set; }
+    public string SeatType { get; set; } = "Regular";
+}
 
-public record UpdateSeatRequest(
-    [Required, StringLength(5)] string RowName,
-    [Range(1, 500)] int SeatNumber,
-    [Required, StringLength(30)] string SeatType
-);
+public class UpdateSeatRequest
+{
+    public string RowName { get; set; } = string.Empty;
+    public int SeatNumber { get; set; }
+    public string SeatType { get; set; } = string.Empty;
+}
 
-public record SeatResponse(
-    int SeatId,
-    int ScreenId,
-    string RowName,
-    int SeatNumber,
-    string SeatType,
-    string SeatLabel
-);
+public class SeatResponse
+{
+    public int SeatId { get; set; }
+    public int ScreenId { get; set; }
+    public string RowName { get; set; } = string.Empty;
+    public int SeatNumber { get; set; }
+    public string SeatType { get; set; } = string.Empty;
+}

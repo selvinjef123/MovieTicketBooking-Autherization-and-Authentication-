@@ -1,31 +1,32 @@
-﻿using System.ComponentModel.DataAnnotations;
-
 namespace MovieTicketBooking.DTOs.Movies;
 
-public record CreateMovieRequest(
-    [Required, StringLength(150)] string Title,
-    [StringLength(500)] string? Description,
-    [Range(1, 1000)] int DurationMinutes,
-    [Required] DateTime ReleaseDate,
-    [Required, StringLength(50)] string Language,
-    [Required, StringLength(50)] string Genre
-);
+public class CreateMovieRequest
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int DurationMinutes { get; set; }
+    public DateTime ReleaseDate { get; set; }
+    public string Language { get; set; } = string.Empty;
+    public string Genre { get; set; } = string.Empty;
+}
 
-public record UpdateMovieRequest(
-    [Required, StringLength(150)] string Title,
-    [StringLength(500)] string? Description,
-    [Range(1, 1000)] int DurationMinutes,
-    [Required] DateTime ReleaseDate,
-    [Required, StringLength(50)] string Language,
-    [Required, StringLength(50)] string Genre
-);
+public class UpdateMovieRequest
+{
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int DurationMinutes { get; set; }
+    public DateTime ReleaseDate { get; set; }
+    public string Language { get; set; } = string.Empty;
+    public string Genre { get; set; } = string.Empty;
+}
 
-public record MovieResponse(
-    int MovieId,
-    string Title,
-    string? Description,
-    int DurationMinutes,
-    DateTime ReleaseDate,
-    string Language,
-    string Genre
-);
+public class MovieResponse
+{
+    public int MovieId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public int DurationMinutes { get; set; }
+    public DateTime ReleaseDate { get; set; }
+    public string Language { get; set; } = string.Empty;
+    public string Genre { get; set; } = string.Empty;
+}

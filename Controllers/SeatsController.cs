@@ -1,56 +1,58 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using MovieTicketBooking.Constants;
 using MovieTicketBooking.DTOs.Seats;
 using MovieTicketBooking.Services.Interfaces;
 
 namespace MovieTicketBooking.Controllers;
 
+[Route("api/seats")]
 [ApiController]
-[Route("api/[controller]")]
 public class SeatsController : ControllerBase
 {
-    private readonly ISeatService _service;
-    public SeatsController(ISeatService service) => _service = service;
+    private readonly ISeatService _seatService;
+    public SeatsController(ISeatService seatService) => _seatService = seatService;
 
     [HttpGet("screen/{screenId:int}")]
-    public async Task<IActionResult> GetByScreen(int screenId) =>
-        Ok(await _service.GetByScreenIdAsync(screenId));
+    public async Task<ActionResult<IEnumerable<SeatResponse>>> GetByScreen(int screenId) => Ok(await _seatService.GetSeatsByScreenIdAsync(screenId));
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id)
+    public async Task<ActionResult<SeatResponse>> GetById(int id)
     {
-        var seat = await _service.GetByIdAsync(id);
-        return seat == null ? NotFound() : Ok(seat);
+        var seat = await _seatService.GetSeatByIdAsync(id);
+        if (seat == null) return NotFound();
+        return Ok(seat);
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateSeatRequest request)
+    public async Task<ActionResult<SeatResponse>> Create([FromBody] CreateSeatRequest request)
     {
-        var (response, error) = await _service.CreateAsync(request);
-        if (error != null) return BadRequest(new { message = error });
-        return CreatedAtAction(nameof(GetById), new { id = response!.SeatId }, response);
+        var created = await _seatService.CreateSeatAsync(request);
+        return CreatedAtAction(nameof(GetById), new { id = created.SeatId }, created);
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpPost("bulk")]
-    public async Task<IActionResult> BulkCreate([FromBody] BulkCreateSeatsRequest request)
+    public async Task<ActionResult<IEnumerable<SeatResponse>>> BulkCreate([FromBody] BulkCreateSeatsRequest request)
     {
-        var (response, error) = await _service.BulkCreateAsync(request);
-        if (error != null) return BadRequest(new { message = error });
-        return Ok(response);
+        var createdSeats = await _seatService.BulkCreateSeatsAsync(request);
+        return Ok(createdSeats);
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateSeatRequest request)
     {
-        var updated = await _service.UpdateAsync(id, request);
-        return updated ? Ok() : NotFound();
+        if (!await _seatService.UpdateSeatAsync(id, request)) return NotFound();
+        return NoContent();
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var (success, errorMessage) = await _service.DeleteAsync(id);
-        if (!success && errorMessage == null) return NotFound();
-        if (!success) return Conflict(new { message = errorMessage });
+        if (!await _seatService.DeleteSeatAsync(id)) return Conflict("Cannot delete seat due to existing bookings.");
         return NoContent();
     }
 }

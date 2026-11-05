@@ -1,13 +1,13 @@
-﻿using MovieTicketBooking.DTOs.Seats;
+using MovieTicketBooking.DTOs.Seats;
 
 namespace MovieTicketBooking.Services.Interfaces;
 
 public interface ISeatService
 {
-    Task<IEnumerable<SeatResponse>> GetByScreenIdAsync(int screenId);
-    Task<SeatResponse?> GetByIdAsync(int id);
-    Task<(SeatResponse? Response, string? ErrorMessage)> CreateAsync(CreateSeatRequest request);
-    Task<(IEnumerable<SeatResponse>? Response, string? ErrorMessage)> BulkCreateAsync(BulkCreateSeatsRequest request);
-    Task<bool> UpdateAsync(int id, UpdateSeatRequest request);
-    Task<(bool Success, string? ErrorMessage)> DeleteAsync(int id);
+	Task<IEnumerable<SeatResponse>> GetSeatsByScreenIdAsync(int screenId);
+	Task<SeatResponse?> GetSeatByIdAsync(int id);
+	Task<SeatResponse> CreateSeatAsync(CreateSeatRequest request);
+	Task<IEnumerable<SeatResponse>> BulkCreateSeatsAsync(BulkCreateSeatsRequest request);
+	Task<bool> UpdateSeatAsync(int id, UpdateSeatRequest request);
+	Task<bool> DeleteSeatAsync(int id);
 }

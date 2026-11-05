@@ -1,19 +1,20 @@
-﻿using System.ComponentModel.DataAnnotations;
-
 namespace MovieTicketBooking.DTOs.Theatres;
 
-public record CreateTheatreRequest(
-    [Required, StringLength(150)] string Name,
-    [Required, StringLength(200)] string Location
-);
+public class CreateTheatreRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string Location { get; set; } = string.Empty;
+}
 
-public record UpdateTheatreRequest(
-    [Required, StringLength(150)] string Name,
-    [Required, StringLength(200)] string Location
-);
+public class UpdateTheatreRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string Location { get; set; } = string.Empty;
+}
 
-public record TheatreResponse(
-    int TheatreId,
-    string Name,
-    string Location
-);
+public class TheatreResponse
+{
+    public int TheatreId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Location { get; set; } = string.Empty;
+}

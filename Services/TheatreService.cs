@@ -1,4 +1,4 @@
-﻿using MovieTicketBooking.DTOs.Theatres;
+using MovieTicketBooking.DTOs.Theatres;
 using MovieTicketBooking.Models;
 using MovieTicketBooking.Repositories.Interfaces;
 using MovieTicketBooking.Services.Interfaces;
@@ -7,55 +7,48 @@ namespace MovieTicketBooking.Services;
 
 public class TheatreService : ITheatreService
 {
-    private readonly ITheatreRepository _repository;
-    public TheatreService(ITheatreRepository repository) => _repository = repository;
+    private readonly ITheatreRepository _theatreRepository;
+    public TheatreService(ITheatreRepository theatreRepository) => _theatreRepository = theatreRepository;
 
-    public async Task<IEnumerable<TheatreResponse>> GetAllAsync()
+    public async Task<IEnumerable<TheatreResponse>> GetAllTheatresAsync()
     {
-        var theatres = await _repository.GetAllAsync();
-        return theatres.Select(MapToResponse);
+        var theatres = await _theatreRepository.GetAllAsync();
+        return theatres.Select(t => new TheatreResponse { TheatreId = t.TheatreId, Name = t.Name, Location = t.Location });
     }
 
-    public async Task<TheatreResponse?> GetByIdAsync(int id)
+    public async Task<TheatreResponse?> GetTheatreByIdAsync(int id)
     {
-        var theatre = await _repository.GetByIdAsync(id);
-        return theatre == null ? null : MapToResponse(theatre);
+        var t = await _theatreRepository.GetByIdAsync(id);
+        if (t == null) return null;
+        return new TheatreResponse { TheatreId = t.TheatreId, Name = t.Name, Location = t.Location };
     }
 
-    public async Task<TheatreResponse> CreateAsync(CreateTheatreRequest request)
+    public async Task<TheatreResponse> CreateTheatreAsync(CreateTheatreRequest request)
     {
-        var theatre = new Theatre
-        {
-            Name = request.Name,
-            Location = request.Location
-        };
-        var created = await _repository.CreateAsync(theatre);
-        return MapToResponse(created);
+        var theatre = new Theatre { Name = request.Name, Location = request.Location };
+        var created = await _theatreRepository.AddAsync(theatre);
+        return new TheatreResponse { TheatreId = created.TheatreId, Name = created.Name, Location = created.Location };
     }
 
-    public async Task<bool> UpdateAsync(int id, UpdateTheatreRequest request)
+    public async Task<bool> UpdateTheatreAsync(int id, UpdateTheatreRequest request)
     {
-        var theatre = await _repository.GetByIdAsync(id);
+        var theatre = await _theatreRepository.GetByIdAsync(id);
         if (theatre == null) return false;
-
         theatre.Name = request.Name;
         theatre.Location = request.Location;
-        await _repository.UpdateAsync(theatre);
+        await _theatreRepository.UpdateAsync(theatre);
         return true;
     }
 
-    public async Task<(bool Success, string? ErrorMessage)> DeleteAsync(int id)
+    public async Task<bool> DeleteTheatreAsync(int id)
     {
-        var theatre = await _repository.GetByIdAsync(id);
-        if (theatre == null) return (false, null);
-
-        if (await _repository.HasScreensAsync(id))
-            return (false, "Cannot delete theatre containing active screens.");
-
-        await _repository.DeleteAsync(theatre);
-        return (true, null);
+        var theatre = await _theatreRepository.GetByIdAsync(id);
+        if (theatre == null) return false;
+        try
+        {
+            await _theatreRepository.DeleteAsync(theatre);
+            return true;
+        }
+        catch { return false; }
     }
-
-    private static TheatreResponse MapToResponse(Theatre t) =>
-        new(t.TheatreId, t.Name, t.Location);
 }

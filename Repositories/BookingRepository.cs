@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using MovieTicketBooking.Data;
 using MovieTicketBooking.Models;
 using MovieTicketBooking.Repositories.Interfaces;
@@ -10,22 +10,13 @@ public class BookingRepository : IBookingRepository
     private readonly ApplicationDbContext _context;
     public BookingRepository(ApplicationDbContext context) => _context = context;
 
-    public async Task<IEnumerable<Booking>> GetAllAsync(int? showId, BookingStatus? status)
-    {
-        var query = _context.Bookings
+    public async Task<IEnumerable<Booking>> GetAllAsync() =>
+        await _context.Bookings
             .Include(b => b.Show).ThenInclude(s => s.Movie)
             .Include(b => b.Show).ThenInclude(s => s.Screen).ThenInclude(sc => sc.Theatre)
             .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
-            .AsNoTracking();
-
-        if (showId.HasValue)
-            query = query.Where(b => b.ShowId == showId.Value);
-
-        if (status.HasValue)
-            query = query.Where(b => b.Status == status.Value);
-
-        return await query.ToListAsync();
-    }
+            .OrderByDescending(b => b.BookingDate)
+            .ToListAsync();
 
     public async Task<Booking?> GetByIdAsync(int id) =>
         await _context.Bookings
@@ -34,52 +25,88 @@ public class BookingRepository : IBookingRepository
             .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
             .FirstOrDefaultAsync(b => b.BookingId == id);
 
-    public async Task<Booking> CreateBookingInTransactionAsync(Booking booking, List<ShowSeat> showSeatsToUpdate)
+    public async Task<Booking?> GetByIdForUpdateAsync(int id) =>
+        await _context.Bookings
+            .Include(b => b.BookingSeats)
+            .FirstOrDefaultAsync(b => b.BookingId == id);
+
+    public async Task<IEnumerable<Booking>> GetByShowIdAsync(int showId) =>
+        await _context.Bookings
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .Where(b => b.ShowId == showId)
+            .ToListAsync();
+
+    public async Task<IEnumerable<Booking>> GetByUserIdAsync(int userId) =>
+        await _context.Bookings
+            .Include(b => b.Show).ThenInclude(s => s.Movie)
+            .Include(b => b.Show).ThenInclude(s => s.Screen).ThenInclude(sc => sc.Theatre)
+            .Include(b => b.BookingSeats).ThenInclude(bs => bs.Seat)
+            .Where(b => b.UserId == userId)
+            .OrderByDescending(b => b.BookingDate)
+            .ToListAsync();
+
+    public async Task<Booking> CreateBookingAsync(Booking booking, IEnumerable<BookingSeat> bookingSeats, IEnumerable<ShowSeat> showSeatsToUpdate)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            _context.Bookings.Add(booking);
-            await _context.SaveChangesAsync();
-
-            foreach (var showSeat in showSeatsToUpdate)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                showSeat.Status = SeatStatus.Booked;
-                _context.ShowSeats.Update(showSeat);
-            }
-            await _context.SaveChangesAsync();
+                _context.Bookings.Add(booking);
+                await _context.SaveChangesAsync();
 
-            await transaction.CommitAsync();
-            return booking;
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
+                booking.BookingReference = $"MOV{booking.BookingId}";
+
+                foreach (var bs in bookingSeats)
+                {
+                    bs.BookingId = booking.BookingId;
+                }
+                _context.BookingSeats.AddRange(bookingSeats);
+
+                foreach (var ss in showSeatsToUpdate)
+                {
+                    ss.Status = "Booked";
+                    _context.ShowSeats.Update(ss);
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return booking;
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
     }
 
-    public async Task CancelBookingInTransactionAsync(Booking booking, List<ShowSeat> showSeatsToRelease)
+    public async Task CancelBookingAsync(Booking booking, IEnumerable<ShowSeat> showSeatsToRelease)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            booking.Status = BookingStatus.Cancelled;
-            _context.Bookings.Update(booking);
-
-            foreach (var showSeat in showSeatsToRelease)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                showSeat.Status = SeatStatus.Available;
-                _context.ShowSeats.Update(showSeat);
-            }
-            await _context.SaveChangesAsync();
+                booking.Status = "Cancelled";
+                _context.Bookings.Update(booking);
 
-            await transaction.CommitAsync();
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
+                foreach (var ss in showSeatsToRelease)
+                {
+                    ss.Status = "Available";
+                    _context.ShowSeats.Update(ss);
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        });
     }
 }

@@ -1,4 +1,4 @@
-﻿using MovieTicketBooking.DTOs.Movies;
+using MovieTicketBooking.DTOs.Movies;
 using MovieTicketBooking.Models;
 using MovieTicketBooking.Repositories.Interfaces;
 using MovieTicketBooking.Services.Interfaces;
@@ -7,22 +7,61 @@ namespace MovieTicketBooking.Services;
 
 public class MovieService : IMovieService
 {
-    private readonly IMovieRepository _repository;
-    public MovieService(IMovieRepository repository) => _repository = repository;
+    private readonly IMovieRepository _movieRepository;
 
-    public async Task<IEnumerable<MovieResponse>> GetAllAsync(int pageNumber, int pageSize, string? title)
+    public MovieService(IMovieRepository movieRepository)
     {
-        var movies = await _repository.GetAllAsync(pageNumber, pageSize, title);
-        return movies.Select(MapToResponse);
+        _movieRepository = movieRepository;
     }
 
-    public async Task<MovieResponse?> GetByIdAsync(int id)
+    public async Task<IEnumerable<MovieResponse>> GetAllMoviesAsync()
     {
-        var movie = await _repository.GetByIdAsync(id);
-        return movie == null ? null : MapToResponse(movie);
+        var movies = await _movieRepository.GetAllAsync();
+        return movies.Select(m => new MovieResponse
+        {
+            MovieId = m.MovieId,
+            Title = m.Title,
+            Description = m.Description,
+            DurationMinutes = m.DurationMinutes,
+            ReleaseDate = m.ReleaseDate,
+            Language = m.Language,
+            Genre = m.Genre
+        });
     }
 
-    public async Task<MovieResponse> CreateAsync(CreateMovieRequest request)
+    public async Task<MovieResponse?> GetMovieByIdAsync(int id)
+    {
+        var m = await _movieRepository.GetByIdAsync(id);
+        if (m == null) return null;
+
+        return new MovieResponse
+        {
+            MovieId = m.MovieId,
+            Title = m.Title,
+            Description = m.Description,
+            DurationMinutes = m.DurationMinutes,
+            ReleaseDate = m.ReleaseDate,
+            Language = m.Language,
+            Genre = m.Genre
+        };
+    }
+
+    public async Task<IEnumerable<MovieResponse>> SearchMoviesAsync(string title)
+    {
+        var movies = await _movieRepository.SearchByTitleAsync(title);
+        return movies.Select(m => new MovieResponse
+        {
+            MovieId = m.MovieId,
+            Title = m.Title,
+            Description = m.Description,
+            DurationMinutes = m.DurationMinutes,
+            ReleaseDate = m.ReleaseDate,
+            Language = m.Language,
+            Genre = m.Genre
+        });
+    }
+
+    public async Task<MovieResponse> CreateMovieAsync(CreateMovieRequest request)
     {
         var movie = new Movie
         {
@@ -34,13 +73,23 @@ public class MovieService : IMovieService
             Genre = request.Genre
         };
 
-        var created = await _repository.CreateAsync(movie);
-        return MapToResponse(created);
+        var created = await _movieRepository.AddAsync(movie);
+
+        return new MovieResponse
+        {
+            MovieId = created.MovieId,
+            Title = created.Title,
+            Description = created.Description,
+            DurationMinutes = created.DurationMinutes,
+            ReleaseDate = created.ReleaseDate,
+            Language = created.Language,
+            Genre = created.Genre
+        };
     }
 
-    public async Task<bool> UpdateAsync(int id, UpdateMovieRequest request)
+    public async Task<bool> UpdateMovieAsync(int id, UpdateMovieRequest request)
     {
-        var movie = await _repository.GetByIdAsync(id);
+        var movie = await _movieRepository.GetByIdAsync(id);
         if (movie == null) return false;
 
         movie.Title = request.Title;
@@ -50,22 +99,23 @@ public class MovieService : IMovieService
         movie.Language = request.Language;
         movie.Genre = request.Genre;
 
-        await _repository.UpdateAsync(movie);
+        await _movieRepository.UpdateAsync(movie);
         return true;
     }
 
-    public async Task<(bool Success, string? ErrorMessage)> DeleteAsync(int id)
+    public async Task<bool> DeleteMovieAsync(int id)
     {
-        var movie = await _repository.GetByIdAsync(id);
-        if (movie == null) return (false, null);
+        var movie = await _movieRepository.GetByIdAsync(id);
+        if (movie == null) return false;
 
-        if (await _repository.HasShowsAsync(id))
-            return (false, "Cannot delete movie because it has existing show schedules.");
-
-        await _repository.DeleteAsync(movie);
-        return (true, null);
+        try
+        {
+            await _movieRepository.DeleteAsync(movie);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
-
-    private static MovieResponse MapToResponse(Movie m) =>
-        new(m.MovieId, m.Title, m.Description, m.DurationMinutes, m.ReleaseDate, m.Language, m.Genre);
 }

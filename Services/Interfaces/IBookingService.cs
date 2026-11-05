@@ -1,12 +1,13 @@
-﻿using MovieTicketBooking.DTOs.Bookings;
-using MovieTicketBooking.Models;
+using MovieTicketBooking.DTOs.Bookings;
 
 namespace MovieTicketBooking.Services.Interfaces;
 
 public interface IBookingService
 {
-    Task<IEnumerable<BookingResponse>> GetAllAsync(int? showId, BookingStatus? status);
-    Task<BookingResponse?> GetByIdAsync(int id);
-    Task<(BookingResponse? Response, string? ErrorMessage, int StatusCode)> CreateBookingAsync(CreateBookingRequest request);
-    Task<(bool Success, string? ErrorMessage, int StatusCode)> CancelBookingAsync(int id);
+	Task<IEnumerable<BookingResponse>> GetAllBookingsAsync();
+	Task<BookingResponse?> GetBookingByIdAsync(int id, int? userId = null);
+	Task<IEnumerable<BookingResponse>> GetBookingsByShowIdAsync(int showId);
+	Task<IEnumerable<BookingResponse>> GetBookingsByUserIdAsync(int userId);
+	Task<BookingResponse> CreateBookingAsync(CreateBookingRequest request, int userId, string customerName, string customerEmail);
+	Task<(bool Success, string? Error)> CancelBookingAsync(int id, int? userId = null);
 }

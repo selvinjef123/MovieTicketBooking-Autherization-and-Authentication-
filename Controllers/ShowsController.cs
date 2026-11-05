@@ -1,84 +1,78 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using MovieTicketBooking.Constants;
 using MovieTicketBooking.DTOs.Shows;
-using MovieTicketBooking.Models;
 using MovieTicketBooking.Services.Interfaces;
 
 namespace MovieTicketBooking.Controllers;
 
+[Route("api/shows")]
 [ApiController]
-[Route("api/[controller]")]
 public class ShowsController : ControllerBase
 {
-    private readonly IShowService _service;
-    public ShowsController(IShowService service) => _service = service;
+    private readonly IShowService _showService;
+    public ShowsController(IShowService showService) => _showService = showService;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] DateTime? date, [FromQuery] int? movieId, [FromQuery] int? theatreId) =>
-        Ok(await _service.GetAllAsync(date, movieId, theatreId));
+    public async Task<ActionResult<IEnumerable<ShowResponse>>> GetAll() => Ok(await _showService.GetAllShowsAsync());
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id)
+    public async Task<ActionResult<ShowResponse>> GetById(int id)
     {
-        var show = await _service.GetByIdAsync(id);
-        return show == null ? NotFound() : Ok(show);
+        var show = await _showService.GetShowByIdAsync(id);
+        if (show == null) return NotFound();
+        return Ok(show);
     }
 
     [HttpGet("movie/{movieId:int}")]
-    public async Task<IActionResult> GetByMovie(int movieId) =>
-        Ok(await _service.GetAllAsync(null, movieId, null));
+    public async Task<ActionResult<IEnumerable<ShowResponse>>> GetByMovie(int movieId) => Ok(await _showService.GetShowsByMovieIdAsync(movieId));
 
     [HttpGet("theatre/{theatreId:int}")]
-    public async Task<IActionResult> GetByTheatre(int theatreId) =>
-        Ok(await _service.GetAllAsync(null, null, theatreId));
+    public async Task<ActionResult<IEnumerable<ShowResponse>>> GetByTheatre(int theatreId) => Ok(await _showService.GetShowsByTheatreIdAsync(theatreId));
 
-    [HttpGet("search")]
-    public async Task<IActionResult> SearchByDate([FromQuery] DateTime date) =>
-        Ok(await _service.GetAllAsync(date, null, null));
-
-    [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateShowRequest request)
+    [HttpGet("{showId:int}/seats")]
+    public async Task<ActionResult<IEnumerable<ShowSeatResponse>>> GetShowSeats(int showId)
     {
-        var (response, error) = await _service.CreateAsync(request);
-        if (error != null) return BadRequest(new { message = error });
-        return CreatedAtAction(nameof(GetById), new { id = response!.ShowId }, response);
+        var show = await _showService.GetShowByIdAsync(showId);
+        if (show == null) return NotFound();
+        return Ok(await _showService.GetShowSeatsAsync(showId));
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
+    [HttpPost]
+    public async Task<ActionResult<ShowResponse>> Create([FromBody] CreateShowRequest request)
+    {
+        try
+        {
+            var created = await _showService.CreateShowAsync(request);
+            return CreatedAtAction(nameof(GetById), new { id = created.ShowId }, created);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
+    }
+
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateShowRequest request)
     {
-        var (success, error) = await _service.UpdateAsync(id, request);
-        if (!success && error == null) return NotFound();
-        if (!success) return BadRequest(new { message = error });
-        return Ok();
+        try
+        {
+            if (!await _showService.UpdateShowAsync(id, request)) return NotFound();
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var (success, errorMessage) = await _service.DeleteAsync(id);
-        if (!success && errorMessage == null) return NotFound();
-        if (!success) return Conflict(new { message = errorMessage });
+        if (!await _showService.DeleteShowAsync(id)) return Conflict("Cannot delete show due to existing bookings.");
         return NoContent();
-    }
-
-    [HttpGet("{showId:int}/seats")]
-    public async Task<IActionResult> GetSeatLayout(int showId)
-    {
-        var seats = await _service.GetShowSeatsAsync(showId);
-        return seats == null ? NotFound() : Ok(seats);
-    }
-
-    [HttpGet("{showId:int}/seats/available")]
-    public async Task<IActionResult> GetAvailableSeats(int showId)
-    {
-        var seats = await _service.GetShowSeatsAsync(showId, SeatStatus.Available);
-        return seats == null ? NotFound() : Ok(seats);
-    }
-
-    [HttpGet("{showId:int}/seats/booked")]
-    public async Task<IActionResult> GetBookedSeats(int showId)
-    {
-        var seats = await _service.GetShowSeatsAsync(showId, SeatStatus.Booked);
-        return seats == null ? NotFound() : Ok(seats);
     }
 }

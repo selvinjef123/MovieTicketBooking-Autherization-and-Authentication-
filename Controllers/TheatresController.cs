@@ -1,46 +1,50 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using MovieTicketBooking.Constants;
 using MovieTicketBooking.DTOs.Theatres;
 using MovieTicketBooking.Services.Interfaces;
 
 namespace MovieTicketBooking.Controllers;
 
+[Route("api/theatres")]
 [ApiController]
-[Route("api/[controller]")]
 public class TheatresController : ControllerBase
 {
-    private readonly ITheatreService _service;
-    public TheatresController(ITheatreService service) => _service = service;
+    private readonly ITheatreService _theatreService;
+    public TheatresController(ITheatreService theatreService) => _theatreService = theatreService;
 
     [HttpGet]
-    public async Task<IActionResult> GetAll() => Ok(await _service.GetAllAsync());
+    public async Task<ActionResult<IEnumerable<TheatreResponse>>> GetAll() => Ok(await _theatreService.GetAllTheatresAsync());
 
     [HttpGet("{id:int}")]
-    public async Task<IActionResult> GetById(int id)
+    public async Task<ActionResult<TheatreResponse>> GetById(int id)
     {
-        var theatre = await _service.GetByIdAsync(id);
-        return theatre == null ? NotFound() : Ok(theatre);
+        var theatre = await _theatreService.GetTheatreByIdAsync(id);
+        if (theatre == null) return NotFound();
+        return Ok(theatre);
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateTheatreRequest request)
+    public async Task<ActionResult<TheatreResponse>> Create([FromBody] CreateTheatreRequest request)
     {
-        var created = await _service.CreateAsync(request);
+        var created = await _theatreService.CreateTheatreAsync(request);
         return CreatedAtAction(nameof(GetById), new { id = created.TheatreId }, created);
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateTheatreRequest request)
     {
-        var updated = await _service.UpdateAsync(id, request);
-        return updated ? Ok() : NotFound();
+        if (!await _theatreService.UpdateTheatreAsync(id, request)) return NotFound();
+        return NoContent();
     }
 
+    [Authorize(Roles = UserRoles.Admin)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var (success, errorMessage) = await _service.DeleteAsync(id);
-        if (!success && errorMessage == null) return NotFound();
-        if (!success) return Conflict(new { message = errorMessage });
+        if (!await _theatreService.DeleteTheatreAsync(id)) return Conflict("Cannot delete theatre due to existing dependencies.");
         return NoContent();
     }
 }
